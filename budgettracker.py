@@ -4,6 +4,7 @@ from datetime import datetime
 
 total_income = 0
 total_expenses = 0
+balance = total_income - total_expenses
 
 income_list = {}
 expense_list = {}
@@ -17,7 +18,7 @@ def add_expense(amount, description):
     total_expenses += float(amount)
 
 def view_balance():
-    return total_income - total_expenses 
+    return balance
 
 def view_summary():
     print(income_list)
@@ -80,21 +81,7 @@ def view_savings_accounts():
         print(f" - Time Needed to Reach Goal: {details['time_needed']} months")
         print()
 
-def add_funds_savings(account_name, additional_contribution):
-    if account_name in savings_accounts:
-        account = savings_accounts[account_name]
-        account['remaining_balance'] -= additional_contribution
-        if account['remaining_balance'] <= 0:
-            account['remaining_balance'] = 0
-            print(f"Congratulations@ You've reached your savings goal for {account_name}!")
-        else:
-            account['time_needed'] = account['remaining_balance'] / account['contribution']
-            print(f"New remaining balance for {account_name}: {account['remaining_balance']}")
-            print(f"New time to reach goal: {account['time_needed']} per month.")
-    else:
-        print(f"Account '{account_name}' not found.")
-
-def auto_transfer_to_savings(account_name, transfer_amount):
+def transfer_to_savings(account_name, transfer_amount):
     if account_name in savings_accounts:
         global total_income, total_expenses
         if transfer_amount > total_income:
@@ -113,17 +100,78 @@ def auto_transfer_to_savings(account_name, transfer_amount):
         savings_accounts[account_name]['time_needed'] = remaining_balance / contribution_per_period if remaining_balance > 0 else 0
         print(f"${transfer_amount} successfully transferred to the savings account '{account_name}'.")
         print(f"New remaining balance: {remaining_balance}")
+        print(f"New time to reach goal: {savings_accounts[account_name]['time_needed']} per month.")
+    else:
+        print(f"Savings account '{account_name}' not found.")
+
+def transfer_from_savings(account_name, transfer_amount):
+    if account_name in savings_accounts:
+        global total_income, total_expenses
+        if transfer_amount > (account_name['goal'] - account_name['remaining_balance']):
+            print(f"Error: Insufficient Funds")
+        balance += transfer_amount
+        print(f"{transfer_amount} transferred from income.")
+        income_list[account_name] = transfer_amount
+        print(f"{transfer_amount} added to income.")
+        savings_accounts[account_name]['remaining_balance'] += transfer_amount
+        remaining_balance = savings_accounts[account_name]['remaining_balance']
+        contribution_per_period = savings_accounts[account_name]['contribution']
+        savings_accounts[account_name]['time_needed'] = remaining_balance / contribution_per_period
+        print(f"${transfer_amount} successfully transferred to your available balance.")
+        print(f"New remaining balance: {remaining_balance}")
+        print(f"New time to reach goal: {savings_accounts[account_name]['time_needed']} per month.")
     else:
         print(f"Savings account '{account_name}' not found.")
 
 # Menu
 
-# 1. Add income
-# 2. Add expense
-# 3. View balance and summary
+def main_menu():
+    print("1. Add Income")
+    print("2. Add Expense")
+    print("3. View Balance and Summary")
+    print("4. Add Bill to Calendar")
+    print("5. View Bills/Upcoming Bills")
+    print("6. Add Extra Income")
+    print("7. Create Savings Account")
+    print("8. View Savings Account Details")
+    print("9. Add to Savings")
+    print("10. Transfer from Savings")
+
+    choice = input("What would you like to do?: ")
+
+    if choice == "1":
+        add_income()
+    if choice == "2":
+        add_expense()
+    if choice == "3":
+        print("1. View Balance")
+        print("2. View Summary")
+        choice2 = input("Choose 1 or 2: ")
+        if choice2 == "1":
+            view_balance()
+        if choice2 == "2":
+            view_summary()
+    if choice == "4":
+        add_bill()
+    if choice == "5":
+        print("1. View Bills")
+        print("2. View Upcoming Bills")
+        choice3 = input("Choose 1 or 2: ")
+        if choice3 == "1":
+            view_bills()
+        if choice3 == "2":
+            view_upcoming_bills()
+    if choice == "6":
+        add_extra_income()
+    if choice == "7":
+        add_savings_account()
+    if choice == "8":
+        view_savings_accounts()
+    if choice == "9":
+        transfer_to_savings()
+    if choice == "10":
+        transfer_from_savings()
+
 # 4. Add bill to calendar - date format must be YYYY, DD, MM
-# 5. View bills/upcoming bills
-# 6. Add extra income
-# 7. Create savings account - contribution_per_period needs to be prompted as per month
-# 8. View savings account details
-# 9. Add to savings
+# Run Budget Tracker
+main_menu()
