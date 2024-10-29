@@ -43,7 +43,10 @@ def export_data_to_csv():
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'r') as file:
-            return json.load(file)
+            data = json.load(file)
+            if "last_startup" in data:
+                data["last_startup"] = datetime.strptime(data["last_startup"], "%Y-%m-%d %H:%M:%S")
+            return data
     else:
         return {
             "balance": 0,
@@ -52,10 +55,12 @@ def load_data():
             "income_list": {},
             "expense_list": {},
             "bill_calendar": {},
-            "savings_accounts": {}
-        }
+            "savings_accounts": {},
+            "last_startup": datetime.min,
+            }
     
 def save_data(data):
+    data["last_startup"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(DATA_FILE, 'w') as file:
         json.dump(data, file, indent=4)
 
@@ -210,13 +215,44 @@ def view_summary():
 
 bill_calendar = {}
 
-def add_bill(name, date_str, amount):
+def add_bill(name, date_str, amount, recurring=False, interval=None):
     due_date = datetime.strptime(date_str, '%Y-%m-%d')
-    bill_calendar[name] = (due_date, amount)
+    bill_entry = {
+        "amount": amount,
+        "due_date": due_date,
+        "recurring": recurring,
+        "interval": interval,
+        "next_due": due_date if recurring else None
+    }
+    data["bill_calendar"][name] = bill_entry
     save_data(data)
     time.sleep(1)
     print(f"Your bill '{name}' has been successfully added to your bill calendar!")
     return_to_menu_or_exit()
+
+def process_recurring_bills(last_startup):
+    today = datetime.now()
+    processed_bills = []
+    for name, bill in data["bill_calendar"].items():
+        if bill["recurring"] and bill["next_due"] and bill["next_due"] <= today:
+            if bill["next_due"] >= last_startup:
+                expense_identifier = f"{name}_{bill["next_due"].strftime('%Y-%m-%d')}"
+                already_added = any(
+                    entry["description"] == expense_identifier for entry in data["expense_list"].values()
+                    )
+                if not already_added:
+                    add_expense(bill["amount"], expense_identifier)
+                    global balance
+                    balance -= bill["amount"]
+                    if bill["interval"] == "weekly":
+                        bill["next_due"] += timedelta(weeks=1)
+                    elif bill["interval"] == "monthly":
+                        next_month = bill["next_due"].month % 12 + 1
+                        year = bill["next_due"].year + (1 if next_month == 1 else 0)
+                        bill["next_due"] = bill["next_due"].replace(year=year, month=next_month)
+                    print(f"Processed recurring bill '{name}' for {bill['amount']:.2f}. Next due on {bill["next_due"].strftime('%Y-%m-%d')}")
+    save_data(data)
+    return processed_bills
 
 def view_bills():
     sorted_bills = sorted(data["bill_calendar"].items(), key=lambda x: x[1]["due_date"])
@@ -341,6 +377,17 @@ def transfer_from_savings(account_name, transfer_amount):
 def main_menu():
     global data
     data = load_data()
+    last_startup = data["last_startup"]
+    processed_bills = process_recurring_bills(last_startup)
+    if processed_bills:
+        print("\nProcessed Recurring Bills Since Last Startup:")
+        for message in processed_bills:
+            print(message)
+        print("\n")
+    else:
+        print("\nNo recurring bills processed since last startup.\n")
+    data["last_startup"] = datetime.now()
+    save_data(data)
     while True:
         print("\nMain Menu:")
         print("1. Add Income")
@@ -376,7 +423,11 @@ def main_menu():
             name = input("What is the name for this bill? ")
             date_str = input("What is the due date? Enter YYYY, DD, MM: ")
             amount = input("What is the amount (in USD)? $")
-            add_bill(name, date_str, amount)
+            is_recurring = input("Is this a recurring bill? (yes/no): ").strip().lower() == "yes"
+            interval = None
+            if is_recurring:
+                interval = input("How often does it recur? (weekly/monthly): ").strip().lower()
+            add_bill(name, date_str, amount, recurring=is_recurring, interval=interval)
         elif choice == "5":
             print("1. View Bills")
             print("2. View Upcoming Bills")
