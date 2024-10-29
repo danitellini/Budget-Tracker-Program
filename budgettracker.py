@@ -1,6 +1,11 @@
 # Budget Tracker
 
+import json
+import os
+import time
 from datetime import datetime
+
+DATA_FILE = "budget_data.json"
 
 total_income = 0
 total_expenses = 0
@@ -9,21 +14,86 @@ balance = total_income - total_expenses
 income_list = {}
 expense_list = {}
 
-def add_income(amount, description):
-    income_list[amount] = description
-    total_income += float(amount)
+# JSON Functions
 
-def add_expense(amount, description):
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, 'r') as file:
+            return json.load(file)
+    else:
+        return {
+            "balance": 0,
+            "total_income": 0,
+            "total_expenses": 0,
+            "income_list": {},
+            "expense_list": {},
+            "bill_calendar": {},
+            "savings_accounts": {}
+        }
+    
+def save_data(data):
+    with open(DATA_FILE, 'w') as file:
+        json.dump(data, file, indent=4)
+
+data = load_data()
+
+# Basic Functions
+
+def return_to_menu_or_exit():
+    while True:
+        choice = input("Would you like to return to the main menu, or exit? (Enter 'menu' or 'exit'): ")
+        if choice.lower() == "menu":
+            main_menu()
+            break
+        elif choice.lower() == "exit":
+            print("Exiting the program...")
+            exit()
+    else:
+        print("Invalid choice. Please try again: ")
+
+def add_income(amount = 0, description = "item"):
+    amount = float(input("Amount (in USD): $"))
+    description = input("Provide a brief, 1-3 word description: ")
+    time.sleep(1)
+    global income_list, total_income, balance
+    income_list[amount] = description
+    total_income += amount
+    balance += amount
+    save_data(data)
+    print("\nIncome Summary:")
+    time.sleep(0.5)
+    print(income_list)
+    time.sleep(0.5)
+    print(f"{description} successfully added to your income. Your new balance is {balance:.2f}.")
+    time.sleep(1)
+    return_to_menu_or_exit()
+
+def add_expense(amount = 0, description = "item"):
+    amount = float(input("Amount (in USD): $"))
+    description = input("Provide a brief, 1-3 word description: ")
+    global expense_list, total_expenses, balance
     expense_list[amount] = description
-    total_expenses += float(amount)
+    total_expenses += amount
+    balance -= amount
+    save_data(data)
+    print("\nExpense Summary:")
+    time.sleep(0.5)
+    print(expense_list)
+    time.sleep(0.5)
+    print(f"{description} successfully added to your expenses. Your new balance is {balance:.2f}.")
+    return_to_menu_or_exit()
 
 def view_balance():
-    return balance
+    global balance
+    print(f"Your balance is {balance:.2f}.")
+    return_to_menu_or_exit()
 
 def view_summary():
+    global income_list, expense_list
     print(income_list)
     print(expense_list)
-    return view_balance()
+    print(view_balance())
+    return_to_menu_or_exit()
 
 # Bill Calendar
 
@@ -32,16 +102,20 @@ bill_calendar = {}
 def add_bill(name, date_str, amount):
     due_date = datetime.strptime(date_str, '%Y-%m-%d')
     bill_calendar[name] = (due_date, amount)
+    save_data(data)
+    return_to_menu_or_exit()
 
 def view_bills():
     for bill, details in bill_calendar.items():
         print(f"Bill: {bill}, Due: {details[0]}, Amount: {details[1]}")
+        return_to_menu_or_exit()
 
 def view_upcoming_bills():
     sorted_bills = sorted(bill_calendar.items(), key=lambda x: x[1][0])
     print("Upcoming Bills:")
     for name, (due_date, amount) in sorted_bills:
             print(f"Bill: {name}, Due: {due_date.strftime('%Y-%m=%d')}, Amount: {amount}")
+    return_to_menu_or_exit()
 
 # Extra Income
 
@@ -50,7 +124,9 @@ extra_income = {}
 def add_extra_income(amount, description):
     extra_income[amount] = description
     total_income += float(amount)
-    return "Your new monthly total income is ", total_income
+    save_data(data)
+    print("Your new monthly total income is ", total_income)
+    return_to_menu_or_exit()
 
 # Savings Account
 
@@ -65,8 +141,10 @@ def add_savings_account(account_name, goal_amount, contribution_per_period):
         'contribution': contribution_per_period,
         'time_needed': time_needed
     }
+    save_data(data)
     print(f"Savings account '{account_name}' created!")
     print(f"It will take {time_needed} months to save {goal_amount} with contributions of {contribution_per_period} per month.")
+    return_to_menu_or_exit()
     #give deletion function that moves remaining balance to income
 
 def view_savings_accounts():
@@ -80,6 +158,7 @@ def view_savings_accounts():
         print(f" - Contribution per Month: {details['contribution']}")
         print(f" - Time Needed to Reach Goal: {details['time_needed']} months")
         print()
+    return_to_menu_or_exit()
 
 def transfer_to_savings(account_name, transfer_amount):
     if account_name in savings_accounts:
@@ -98,11 +177,13 @@ def transfer_to_savings(account_name, transfer_amount):
         remaining_balance = savings_accounts[account_name]['remaining_balance']
         contribution_per_period = savings_accounts[account_name]['contribution']
         savings_accounts[account_name]['time_needed'] = remaining_balance / contribution_per_period if remaining_balance > 0 else 0
+        save_data(data)
         print(f"${transfer_amount} successfully transferred to the savings account '{account_name}'.")
         print(f"New remaining balance: {remaining_balance}")
         print(f"New time to reach goal: {savings_accounts[account_name]['time_needed']} per month.")
     else:
         print(f"Savings account '{account_name}' not found.")
+    return_to_menu_or_exit()
 
 def transfer_from_savings(account_name, transfer_amount):
     if account_name in savings_accounts:
@@ -117,11 +198,13 @@ def transfer_from_savings(account_name, transfer_amount):
         remaining_balance = savings_accounts[account_name]['remaining_balance']
         contribution_per_period = savings_accounts[account_name]['contribution']
         savings_accounts[account_name]['time_needed'] = remaining_balance / contribution_per_period
+        save_data(data)
         print(f"${transfer_amount} successfully transferred to your available balance.")
         print(f"New remaining balance: {remaining_balance}")
         print(f"New time to reach goal: {savings_accounts[account_name]['time_needed']} per month.")
     else:
         print(f"Savings account '{account_name}' not found.")
+    return_to_menu_or_exit()
 
 # Menu
 
@@ -136,41 +219,47 @@ def main_menu():
     print("8. View Savings Account Details")
     print("9. Add to Savings")
     print("10. Transfer from Savings")
+    print("11. Exit")
 
     choice = input("What would you like to do?: ")
 
     if choice == "1":
         add_income()
-    if choice == "2":
+    elif choice == "2":
         add_expense()
-    if choice == "3":
+    elif choice == "3":
         print("1. View Balance")
         print("2. View Summary")
         choice2 = input("Choose 1 or 2: ")
         if choice2 == "1":
             view_balance()
-        if choice2 == "2":
+        elif choice2 == "2":
             view_summary()
-    if choice == "4":
+    elif choice == "4":
         add_bill()
-    if choice == "5":
+    elif choice == "5":
         print("1. View Bills")
         print("2. View Upcoming Bills")
         choice3 = input("Choose 1 or 2: ")
         if choice3 == "1":
             view_bills()
-        if choice3 == "2":
+        elif choice3 == "2":
             view_upcoming_bills()
-    if choice == "6":
+    elif choice == "6":
         add_extra_income()
-    if choice == "7":
+    elif choice == "7":
         add_savings_account()
-    if choice == "8":
+    elif choice == "8":
         view_savings_accounts()
-    if choice == "9":
+    elif choice == "9":
         transfer_to_savings()
-    if choice == "10":
+    elif choice == "10":
         transfer_from_savings()
+    elif choice == "11":
+        print("Exiting from program...")
+        exit()
+    else:
+        print("Invalid choice. Please try again: ")
 
 # 4. Add bill to calendar - date format must be YYYY, DD, MM
 # Run Budget Tracker
