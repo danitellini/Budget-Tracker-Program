@@ -4,6 +4,7 @@ import json
 import os
 import time
 from datetime import datetime, timedelta
+import csv
 
 DATA_FILE = "budget_data.json"
 
@@ -13,6 +14,29 @@ balance = total_income - total_expenses
 
 income_list = {}
 expense_list = {}
+
+# CSV Functions
+
+def export_data_to_csv():
+    with open("budget_report.csv", 'w', newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Type", "Amount", "Description", "Timestamp", "Date"])
+        for amount, details in data["income_list"].items():
+            description = details["description"]
+            timestamp = details["timestamp"]
+            writer.writerow(["Income", amount, description, timestamp])
+        for amount, details in data["expense_list"].items():
+            description = details["description"]
+            timestamp = details["timestamp"]
+            writer.writerow(["Expense", amount, description, timestamp])
+        for name, details in data["bill_calendar"].items():
+            due_date = details["due_date"].strftime('%y-%m-%d')
+            amount = details["amount"]
+            writer.writerow(["Bill", amount, name, "", due_date])
+        for account, details in data["savings_accounts"].items():
+            remaining_balance = details["remaining_balance"]
+            writer.writerow(["Savings", remaining_balance, account])
+    print("Data exported to budget_report.csv")
 
 # JSON Functions
 
@@ -35,6 +59,57 @@ def save_data(data):
     with open(DATA_FILE, 'w') as file:
         json.dump(data, file, indent=4)
 
+# Delete Functions
+
+def delete_income(amount, description):
+    global total_income, balance
+    if amount in data["income_list"] and data["income_list"][amount] == description:
+        data["income_list"].pop(amount)
+        total_income -= amount
+        balance -= amount
+        save_data(data)
+        print(f"Income '{description} of ${amount:.2f} deleted.")
+    else:
+        print("Income entry not found.")
+    return_to_menu_or_exit()
+
+def delete_expense(amount, description):
+    global total_expenses, balance
+    if amount in data["expense_list"] and data["expense_list"][amount] == description:
+        data["expense_list"].pop(amount)
+        total_expenses -= amount
+        balance -= amount
+        save_data(data)
+        print(f"Expense '{description}' of ${amount:.2f} deleted.")
+    else:
+        print("Expense entry not found.")
+    return_to_menu_or_exit()
+
+def delete_bill(name):
+    if name in data["bill_calendar"]:
+        data["bill_calendar"].pop(name)
+        save_data(data)
+        print(f"Bill '{name}' deleted.")
+    else:
+        print("Bill not found.")
+    return_to_menu_or_exit()
+
+def delete_savings_account(account_name):
+    global total_income, balance
+    if account_name in data["savings_accounts"]:
+        saved_amount = data["savings_accounts"][account_name]["goal"] - data["savings_accounts"][account_name]["remaining_balance"]
+        total_income += saved_amount
+        balance += saved_amount
+        data["income_list"][saved_amount] = f"Saved amount from {account_name} savings account."
+        data["savings_accounts"].pop(account_name)
+        save_data(data)
+        print(f"Savings account '{account_name}' deleted.")
+        time.sleep(0.5)
+        print(f"Saved amount of ${saved_amount:.2f} added to income.")
+    else:
+        print("Savins account not found.")
+    return_to_menu_or_exit()
+
 # Display Functions
 
 def display_income():
@@ -42,16 +117,35 @@ def display_income():
     if not data["income_list"]:
         print("No income records.")
     else:
-        for i, entry in enumerate(data["income_list"], start=1):
-            print(f"{i}. Amount: ${entry['amount']:.2f}, Description: {entry['description']}")
+        for i, (amount, description, date) in enumerate(data["income_list"].items(), start=1):
+            print(f"{i}. Amount: ${amount:.2f}, Description: {description}, Date: {date}")
+    time.sleep(1)
+    choice = input("\nWould you like to delete an income entry? (yes/no): ").strip().lower()
+    if choice == "yes":
+        index = int(input("Enter the number of the income entry you want to delete: ")) - 1
+        if 0 <= index < len(data["income_list"]):
+            amount, description = list(data["income_list"].items())[index]
+            delete_income(amount, description)
+        else:
+            print("Invalid entry number.")
+    return_to_menu_or_exit()
 
 def display_expenses():
     print("\nExpense List:")
     if not data["expense_list"]:
         print("No expense records.")
     else:
-        for i, entry in enumerate(data["expense_list"], start=1):
-            print(f"{i}. Amount: ${entry['amount']:.2f}, Description: {entry['description']}")
+        for i, (amount, description) in enumerate(data["expense_list"].items(), start=1):
+            print(f"{i}. Amount: ${amount:.2f}, Description: {description}")
+    choice = input("\nWould you like to delete an expense entry? (yes/no):").strip().lower()
+    if choice == "no":
+        index = int(input("Enter the number of the expense entry you want to delete: ")) - 1
+        if 0 <= index < len(data["expense_list"]):
+            amount, description = list(data["expense_list"].items())[index]
+            delete_expense(amount, description)
+        else:
+            print("Invalid entry number.")
+    return_to_menu_or_exit()
 
 # Functions
 
@@ -69,14 +163,15 @@ def return_to_menu_or_exit():
 
 def add_income(amount = 0, description = "item"):
     global income_list, total_income, balance
-    income_list[amount] = description
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    data["income_list"][amount] = {"description": description, "timestamp": timestamp}
     total_income += amount
     balance += amount
     save_data(data)
     time.sleep(1)
     print("\nIncome Summary:")
     time.sleep(0.5)
-    print(income_list)
+    print(display_income())
     time.sleep(0.5)
     print(f"{description} successfully added to your income. Your new balance is {balance:.2f}.")
     time.sleep(1)
@@ -84,7 +179,8 @@ def add_income(amount = 0, description = "item"):
 
 def add_expense(amount = 0, description = "item"):
     global expense_list, total_expenses, balance
-    expense_list[amount] = description
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    data["expense_list"][amount] = {"description": description, "timestamp": timestamp}
     total_expenses += amount
     balance -= amount
     save_data(data)
@@ -123,10 +219,19 @@ def add_bill(name, date_str, amount):
     return_to_menu_or_exit()
 
 def view_bills():
-    sorted_bills = sorted(bill_calendar.items(), key=lambda x: x[1][0])
+    sorted_bills = sorted(data["bill_calendar"].items(), key=lambda x: x[1]["due_date"])
     print("Bill Calendar:")
-    for name, (due_date, amount) in sorted_bills:
-            print(f"Bill: {name}, Due: {due_date.strftime('%Y-%m=%d')}, Amount: {amount:.2f}")
+    if not sorted_bills:
+        print("No bills available.")
+    else:
+        for name, details in sorted_bills:
+            due_date = details["due_date"]
+            amount = details["amount"]
+            print(f"Bill: {name}, Due: {due_date.strftime('%Y-%m-%d')}, Amount: ${amount:.2f}")
+    choice = input("\n Would you like to delete a bill? (yes/no): ").strip().lower()
+    if choice == "yes":
+        name = input("Enter the name of the bill you want to delete: ")
+        delete_bill(name)
     return_to_menu_or_exit()
 
 def view_upcoming_bills():
@@ -179,6 +284,10 @@ def view_savings_accounts():
             print(f" - Contribution per Month: {details['contribution']:.2f}")
             print(f" - Time Needed to Reach Goal: {details['time_needed']} months")
             print()
+    choice = input("\nWould you like to delete a savings account? (yes/no): ").strip().lower()
+    if choice == "yes":
+        account_name = input("Enter the name of the savings account you want to delete: ")
+        delete_savings_account(account_name)
     return_to_menu_or_exit()
 
 def transfer_to_savings(account_name, transfer_amount):
@@ -302,7 +411,7 @@ main_menu()
 
 # NOTES
 #
-# delete capabilities
-# display functions properly listed in view_summary()
+# 
+# 
 #
 #
