@@ -3,7 +3,7 @@
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DATA_FILE = "budget_data.json"
 
@@ -102,8 +102,12 @@ def view_balance():
     return_to_menu_or_exit()
 
 def view_summary():
-    print("\nComplete Budget Data:")
-    print(json.dumps(data,indent=4))
+    print("\nComplete Budget Summary:")
+    print(view_balance())
+    print(display_income())
+    print(display_expenses())
+    print(view_bills())
+    print(view_savings_accounts())
     return_to_menu_or_exit()
 
 # Bill Calendar
@@ -114,18 +118,32 @@ def add_bill(name, date_str, amount):
     due_date = datetime.strptime(date_str, '%Y-%m-%d')
     bill_calendar[name] = (due_date, amount)
     save_data(data)
+    time.sleep(1)
+    print(f"Your bill '{name}' has been successfully added to your bill calendar!")
     return_to_menu_or_exit()
 
 def view_bills():
-    for bill, details in bill_calendar.items():
-        print(f"Bill: {bill}, Due: {details[0]}, Amount: {details[1]}")
-        return_to_menu_or_exit()
+    sorted_bills = sorted(bill_calendar.items(), key=lambda x: x[1][0])
+    print("Bill Calendar:")
+    for name, (due_date, amount) in sorted_bills:
+            print(f"Bill: {name}, Due: {due_date.strftime('%Y-%m=%d')}, Amount: {amount:.2f}")
+    return_to_menu_or_exit()
 
 def view_upcoming_bills():
-    sorted_bills = sorted(bill_calendar.items(), key=lambda x: x[1][0])
-    print("Upcoming Bills:")
-    for name, (due_date, amount) in sorted_bills:
-            print(f"Bill: {name}, Due: {due_date.strftime('%Y-%m=%d')}, Amount: {amount}")
+    today = datetime.now()
+    upcoming_date = today + timedelta(days=15)
+    sorted_bills = sorted(
+        ((name,details) for name, details in data["bill_calendar"].items() if today <= details["due_date"] <= upcoming_date),
+        key=lambda x: x[1]["due_date"]
+        )
+    print("Upcoming Bills (Next 15 Days):")
+    if not sorted_bills:
+        print("No bills due in the next 15 days.")
+    else:
+        for name, details in sorted_bills:
+            due_date = details["due_date"]
+            amount = details["amount"]
+            print(f"Bill: {name}, Due: {due_date.strftime('%Y-%m=%d')}, Amount: {amount:.2f}")
     return_to_menu_or_exit()
 
 # Savings Account
@@ -142,7 +160,9 @@ def add_savings_account(account_name, goal_amount, contribution_per_period):
         'time_needed': time_needed
     }
     save_data(data)
+    time.sleep(1)
     print(f"Savings account '{account_name}' created!")
+    time.sleep(0.5)
     print(f"It will take {time_needed} months to save {goal_amount} with contributions of {contribution_per_period} per month.")
     return_to_menu_or_exit()
     #give deletion function that moves remaining balance to income
@@ -154,9 +174,9 @@ def view_savings_accounts():
     else:
         for account_name, details in data["savings_accounts"].items():
             print(f"Account Name: {account_name}")
-            print(f" - Goal Amount: {details['goal']}:.2f")
-            print(f" - Remaining Balance: {details['remaining_balance']}:.2f")
-            print(f" - Contribution per Month: {details['contribution']}:.2f")
+            print(f" - Goal Amount: {details['goal']:.2f}")
+            print(f" - Remaining Balance: {details['remaining_balance']:.2f}")
+            print(f" - Contribution per Month: {details['contribution']:.2f}")
             print(f" - Time Needed to Reach Goal: {details['time_needed']} months")
             print()
     return_to_menu_or_exit()
@@ -244,7 +264,10 @@ def main_menu():
             elif choice2 == "2":
                 view_summary()
         elif choice == "4":
-            add_bill()
+            name = input("What is the name for this bill? ")
+            date_str = input("What is the due date? Enter YYYY, DD, MM: ")
+            amount = input("What is the amount (in USD)? $")
+            add_bill(name, date_str, amount)
         elif choice == "5":
             print("1. View Bills")
             print("2. View Upcoming Bills")
@@ -254,18 +277,32 @@ def main_menu():
             elif choice3 == "2":
                 view_upcoming_bills()
         elif choice == "6":
-            add_savings_account()
+            account_name = input("What would you like to name this account? ")
+            goal_amount = input("What is the amount (in USD) you'd like to save? $")
+            contribution_per_period = input("How much would you like to save (in USD) towards this goal, per month? $")
+            add_savings_account(account_name, goal_amount, contribution_per_period)
         elif choice == "7":
             view_savings_accounts()
         elif choice == "8":
-            transfer_to_savings()
+            account_name = input("What account would you like to transfer money to? ")
+            transfer_amount = input("What amount (in USD) would you like to transfer? $")
+            transfer_to_savings(account_name, transfer_amount)
         elif choice == "9":
-            transfer_from_savings()
+            account_name = input("What account would you like to transfer money out of? ")
+            transfer_amount = input("What amount (in USD) would you like to transfer to your available balance? $")
+            transfer_from_savings(account_name, transfer_amount)
         elif choice == "10":
             print("Exiting from program...")
             exit()
     else:
         print("Invalid choice. Please try again: ")
-# 4. Add bill to calendar - date format must be YYYY, DD, MM
+
 # Run Budget Tracker
 main_menu()
+
+# NOTES
+#
+# delete capabilities
+# display functions properly listed in view_summary()
+#
+#
