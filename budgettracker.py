@@ -378,6 +378,7 @@ def main_menu():
     global data
     data = load_data()
     last_startup = data["last_startup"]
+    print("\nBudget Tracker\n")
     processed_bills = process_recurring_bills(last_startup)
     if processed_bills:
         print("\nProcessed Recurring Bills Since Last Startup:")
